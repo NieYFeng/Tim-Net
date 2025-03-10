@@ -58,7 +58,7 @@ CLASS_LABELS_dict = {"CASIA": CASIA_CLASS_LABELS,
                "RAVDE": RAVDE_CLASS_LABELS,
                "SAVEE": SAVEE_CLASS_LABELS}
 
-data = np.load("./MFCC/"+args.data+".npy",allow_pickle=True).item()
+data = np.load("./Code/MFCC/"+args.data+".npy", allow_pickle=True).item()
 x_source = data["x"]
 y_source = data["y"]
 CLASS_LABELS = CLASS_LABELS_dict[args.data]
