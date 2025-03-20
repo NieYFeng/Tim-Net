@@ -58,8 +58,10 @@ def main(audio_path: str, models_dir: str):
         hop_length=256
     ).T
 
-    # 标准化（需使用训练时的全局统计量）
-    mfcc = (mfcc - np.load("casia_mfcc_mean.npy")) / (np.load("casia_mfcc_std.npy") + 1e-8)
+    # 在线标准化（使用当前音频的统计量）
+    mfcc_mean = np.mean(mfcc, axis=0)
+    mfcc_std = np.std(mfcc, axis=0)
+    mfcc = (mfcc - mfcc_mean) / (mfcc_std + 1e-8)
 
     # 调整时间步
     if mfcc.shape[0] < CASIA_SETTINGS["timesteps"]:
