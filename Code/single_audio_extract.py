@@ -1,9 +1,11 @@
-# ensemble_casia_test.py
 import numpy as np
 import librosa
 import tensorflow as tf
 import argparse
 from pathlib import Path
+from TIMNET import TIMNET  # 导入TIMNET模型结构
+from tensorflow.keras.layers import Input, Dense
+from tensorflow.keras.models import Model
 
 # CASIA 配置
 CASIA_SETTINGS = {
@@ -16,7 +18,25 @@ CASIA_SETTINGS = {
 }
 
 
-def load_models(models_dir: str) -> list:
+def build_timnet_model(input_shape, num_classes):
+    """构建TIMNET模型结构"""
+    inputs = Input(shape=(input_shape[0], input_shape[1]))
+    multi_decision = TIMNET(
+        nb_filters=64,  # 根据训练参数调整
+        kernel_size=2,  # 根据训练参数调整
+        nb_stacks=1,    # 根据训练参数调整
+        dilations=[1, 2, 4, 8],  # 根据训练参数调整
+        dropout_rate=0.1,  # 根据训练参数调整
+        activation='relu',  # 根据训练参数调整
+        return_sequences=True
+    )(inputs)
+    decision = Dense(64, activation='relu')(multi_decision)  # 假设中间层
+    predictions = Dense(num_classes, activation='softmax')(decision)
+    model = Model(inputs=inputs, outputs=predictions)
+    return model
+
+
+def load_models(models_dir: str, input_shape, num_classes) -> list:
     """加载全部10个交叉验证模型"""
     model_paths = list(Path(models_dir).glob(CASIA_SETTINGS["model_glob"]))
     assert len(model_paths) == 10, f"应找到10个模型，实际找到{len(model_paths)}"
@@ -24,8 +44,10 @@ def load_models(models_dir: str) -> list:
     models = []
     for path in sorted(model_paths):  # 按fold顺序加载
         try:
-            models.append(tf.keras.models.load_model(str(path)))
-            print(f"成功加载模型: {path.name}")
+            model = build_timnet_model(input_shape, num_classes)
+            model.load_weights(str(path))  # 加载权重
+            models.append(model)
+            print(f"成功加载模型权重: {path.name}")
         except Exception as e:
             raise RuntimeError(f"加载{path}失败: {str(e)}")
     return models
@@ -72,7 +94,9 @@ def main(audio_path: str, models_dir: str):
     input_tensor = mfcc[np.newaxis, ..., np.newaxis]  # (1, 96, 39, 1)
 
     # 加载模型
-    models = load_models(models_dir)
+    input_shape = (CASIA_SETTINGS["timesteps"], CASIA_SETTINGS["n_mfcc"])
+    num_classes = len(CASIA_SETTINGS["labels"])
+    models = load_models(models_dir, input_shape, num_classes)
 
     # 集成预测
     results = ensemble_predict(models, input_tensor)
